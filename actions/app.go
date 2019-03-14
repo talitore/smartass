@@ -40,6 +40,11 @@ func App() *buffalo.App {
 			SessionName: "_smartass_session",
 		})
 
+		// sess := session.New(&aws.Config{
+		// 	Region: aws.String("us-east-1"),
+		// })
+		// svc := rekognition.New(sess)
+
 		// Automatically redirect to SSL
 		app.Use(forceSSL())
 
@@ -61,6 +66,7 @@ func App() *buffalo.App {
 		app.GET("/", HomeHandler)
 
 		app.Resource("/assets", AssetsResource{})
+
 		app.ServeFiles("/", assetsBox) // serve files from the public directory
 	}
 
