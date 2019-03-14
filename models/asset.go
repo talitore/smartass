@@ -2,11 +2,16 @@ package models
 
 import (
 	"encoding/json"
-	"io"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/rekognition"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gobuffalo/buffalo/binding"
 	"github.com/gobuffalo/nulls"
 	"github.com/gobuffalo/pop"
@@ -14,7 +19,6 @@ import (
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
 	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 )
 
 type Asset struct {
@@ -70,33 +74,25 @@ func (a *Asset) AfterSave(tx *pop.Connection) error {
 	if !a.Image.Valid() {
 		return nil
 	}
-	dir := filepath.Join(".", "uploads")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return errors.WithStack(err)
-	}
-	f, err := os.Create(filepath.Join(dir, a.Image.Filename))
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	defer f.Close()
-	_, err = io.Copy(f, a.Image)
-	return err
-
-	// bucket := "ga-create-api-staging/smartass"
-	// filename := a.Image.Filename
-
-	// fmt.Println(filename)
-	// fmt.Println(os.Getenv("AWS_ACCESS_KEY_ID"))
-
-	// file, err := os.Open(filename)
-	// if err != nil {
-	// 	fmt.Println("Failed to open file", filename, err)
-	// 	os.Exit(1)
+	// dir := filepath.Join(".", "uploads")
+	// if err := os.MkdirAll(dir, 0755); err != nil {
+	// 	return errors.WithStack(err)
 	// }
-	// defer file.Close()
+	// f, err := os.Create(filepath.Join(dir, a.Image.Filename))
+	// if err != nil {
+	// 	return errors.WithStack(err)
+	// }
+	// defer f.Close()
+	// _, err = io.Copy(f, a.Image)
+	// return err
+
+	bucket := "ga-create-api-staging"
+	filename := a.Image.Filename
+
+	fmt.Println(filename)
+	fmt.Println(os.Getenv("AWS_ACCESS_KEY_ID"))
 
 	// list buckets
-
 	// svc := s3.New(session.New(&aws.Config{
 	// 	Region: aws.String("us-east-1")},
 	// ))
@@ -121,75 +117,54 @@ func (a *Asset) AfterSave(tx *pop.Connection) error {
 	// fmt.Println(result)
 
 	// upload
-	// svc := s3.New(session.New(&aws.Config{
-	// 	Region: aws.String("us-east-1")},
-	// ))
-	// sess, err := session.NewSession(&aws.Config{
-	// 	Region: aws.String("us-east-1")},
-	// )
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// 	return err
-	// }
+	s3svc := s3.New(session.New(&aws.Config{
+		Region: aws.String("us-east-1")},
+	))
+	uploader := s3manager.NewUploaderWithClient(s3svc)
+	location := "smartass/" + filepath.Base(filename)
 
-	// // Create S3 service client
+	fmt.Println("Uploading file to S3...")
+	s3result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(location),
+		Body:   a.Image.File,
+		ACL:    aws.String("public-read"),
+	})
+	if err != nil {
+		fmt.Println("error", err)
+		os.Exit(1)
+	}
 
-	// svc := s3.New(session.New(&aws.Config{
-	// 	Region: aws.String("us-east-1")},
-	// ))
-	// uploader := s3manager.NewUploaderWithClient(svc)
+	fmt.Printf("Successfully uploaded %s to %s\n", filename, s3result.Location)
 
-	// fmt.Println("Uploading file to S3...")
-	// result, err := uploader.Upload(&s3manager.UploadInput{
-	// 	Bucket: aws.String(bucket),
-	// 	Key:    aws.String(filepath.Base(filename)),
-	// 	Body:   a.Image.File.,
-	// })
-	// if err != nil {
-	// 	fmt.Println("error", err)
-	// 	os.Exit(1)
-	// }
+	// return nil
 
-	// fmt.Printf("Successfully uploaded %s to %s\n", filename, result.Location)
+	// Send request to Rekognition.
+	rekSvc := rekognition.New(session.New(&aws.Config{
+		Region: aws.String("us-east-1")},
+	))
+	input := &rekognition.DetectLabelsInput{
+		Image: &rekognition.Image{
+			S3Object: &rekognition.S3Object{
+				Bucket: aws.String(bucket),
+				Name:   aws.String(location),
+			},
+		},
+	}
 
-	return nil
+	rekResult, err := rekSvc.DetectLabels(input)
+	if err != nil {
+		return err
+	}
 
-	//////////////////////////////////////////
+	output, err := json.Marshal(rekResult)
+	if err != nil {
+		return err
+	}
 
-	// if c.Request().Body == nil {
-	// 	return errors.New("Empty body")
-	// }
-
-	// err := json.NewDecoder(c.Request().Body).Decode(&parsed)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Decode the string.
-	// decodedImage, err := base64.StdEncoding.DecodeString(parsed.Image)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // Send request to Rekognition.
-	// input := &rekognition.DetectLabelsInput{
-	// 	Image: &rekognition.Image{
-	// 		Bytes: decodedImage,
-	// 	},
-	// }
-
-	// result, err := svc.DetectLabels(input)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// output, err := json.Marshal(result)
-	// if err != nil {
-	// 	return err
-	// }
-
+	fmt.Println(string(output))
 	// c.Response().Header().Set("Content-Type", "application/json")
 	// c.Response().WriteHeader(http.StatusOK)
 	// c.Response().Write(output)
-	// return nil
+	return nil
 }
