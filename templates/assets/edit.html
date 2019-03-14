@@ -1,0 +1,8 @@
+<div class="page-header">
+  <h1>Edit Asset</h1>
+</div>
+
+<%= form_for(asset, {action: assetPath(asset.ID.String()), method: "PUT"}) { %>
+  <%= partial("assets/form.html") %>
+  <a href="<%= assetPath(asset.ID.String()) %>" class="btn btn-warning" data-confirm="Are you sure?">Cancel</a>
+<% } %>

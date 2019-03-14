@@ -1,0 +1,8 @@
+<div class="page-header">
+  <h1>New Asset</h1>
+</div>
+
+<%= form_for(asset, {action: assetsPath(), method: "POST"}) { %>
+  <%= partial("assets/form.html") %>
+  <a href="<%= assetsPath() %>" class="btn btn-warning" data-confirm="Are you sure?">Cancel</a>
+<% } %>

@@ -1,0 +1,6 @@
+- id: "asset.created.success"
+  translation: "Asset was successfully created."
+- id: "asset.updated.success"
+  translation: "Asset was successfully updated."
+- id: "asset.destroyed.success"
+  translation: "Asset was successfully destroyed."

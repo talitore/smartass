@@ -1,0 +1,8 @@
+create_table("assets") {
+	t.Column("id", "uuid", {primary: true})
+	t.Column("name", "string", {})
+	t.Column("description", "text", {null: true})
+	t.Column("url", "string", {})
+	t.Column("labels", "varchar[]", {})
+	t.Column("user_guid", "string", {})
+}
